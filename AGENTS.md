@@ -10,7 +10,10 @@ Read these rules and `README.md` before acting.
 When asked to apply this repo, follow this exact sequence:
 
 1. **Verify `ocx` (OpenCodex):** Check if `ocx` is installed (`command -v ocx`).
-   - If not installed: find the official installation method (e.g. via web search or checking the official repo) and install it. Verify installation afterwards.
+   - If not installed: use the official OpenCodex upstream as the authoritative
+     source for the current installation method:
+     https://github.com/lidge-jun/opencodex
+     Follow the upstream README to install, then verify with `ocx --version`.
    - If already installed: use the existing installation. Do not reinstall or change its version.
 2. **Verify Python:** Ensure `python3` is available.
 3. **Verify Providers:** Check if the required providers exist by running `ocx provider list` or checking config. The required providers are `anthropic` and `google-antigravity`.

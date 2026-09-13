@@ -48,6 +48,7 @@ The agent will automatically install OpenCodex (if missing), verify your environ
 ### Manual setup
 
 Requires OpenCodex (`ocx`) and `python3` already installed.
+OpenCodex: https://github.com/lidge-jun/opencodex
 
 ```bash
 git clone <this-repo-url>
