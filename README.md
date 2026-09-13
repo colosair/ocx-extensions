@@ -5,6 +5,10 @@ Reproduces one Codex desktop setup on a new machine: the model picker list
 
 <table>
   <tr>
+    <th>Model picker</th>
+    <th>Quota gauges</th>
+  </tr>
+  <tr>
     <td><img src="docs/model-picker.png" alt="Codex model picker with the restored order" height="300"></td>
     <td><img src="docs/quota-bars.png" alt="ocx-quota gauge output" height="300"></td>
   </tr>
