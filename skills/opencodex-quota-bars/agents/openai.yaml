@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenCodex Quota Bars"
+  short_description: "Show aligned OpenCodex quota gauges"
+  default_prompt: "Use $opencodex-quota-bars to show my current provider quotas."
