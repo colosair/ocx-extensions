@@ -26,8 +26,8 @@ logs in on its own.
 Requires `opencodex` (`ocx`) and `python3` already installed.
 
 ```bash
-git clone <this-repo-url> ~/projects/ocx-extensions
-cd ~/projects/ocx-extensions
+git clone <this-repo-url>
+cd ocx-extensions
 
 ocx login anthropic            # browser OAuth, creates the anthropic provider
 ocx login google-antigravity   # browser OAuth, creates the Antigravity provider
