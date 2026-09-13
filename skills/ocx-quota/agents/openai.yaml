@@ -1,0 +1,4 @@
+interface:
+  display_name: "OCX Quota"
+  short_description: "Show aligned OpenCodex quota gauges"
+  default_prompt: "Use $ocx-quota to show my current provider quotas."

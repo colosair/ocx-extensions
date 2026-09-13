@@ -16,7 +16,7 @@ What travels between machines:
 | File | Contents |
 | --- | --- |
 | `profile.json` | The config paths that define picker order, hidden models, and display names |
-| `skills/opencodex-quota-bars/` | The quota-gauge skill, copied into `$CODEX_HOME/skills` |
+| `skills/ocx-quota/` | The quota-gauge skill, copied into `$CODEX_HOME/skills` |
 
 Accounts, OAuth tokens, ports, and API keys are never stored here. Each machine
 logs in on its own.
@@ -60,7 +60,7 @@ The `Google *` names mark models served through Antigravity rather than through
 the vendor directly. They spend the Antigravity shared pool, not the Anthropic
 subscription — which is why they are named apart from `Opus 5` / `Sonnet 5`.
 
-Then `$opencodex-quota-bars` prints live quota gauges for every connected
+Then `$ocx-quota` prints live quota gauges for every connected
 provider. Providers that are not connected on that machine are simply absent
 from the output; that is not an error.
 

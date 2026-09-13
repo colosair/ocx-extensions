@@ -1,5 +1,5 @@
 ---
-name: opencodex-quota-bars
+name: ocx-quota
 description: Display current OpenCodex provider quotas as compact, aligned text gauge bars. Use when the user asks to view OpenAI, Anthropic, or Google Antigravity usage in the agreed terminal-style format.
 ---
 
