@@ -5,7 +5,11 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-command -v ocx >/dev/null 2>&1 || { echo "ocx not found. Install opencodex first." >&2; exit 1; }
+command -v ocx >/dev/null 2>command -v ocx >/dev/null 2>&1 || { echo "ocx not found. Install opencodex first." >&2; exit 1; }1 || {
+  echo "OpenCodex (ocx) is required but was not found." >&2
+  echo "Please install OpenCodex first, then re-run this script." >&2
+  exit 1
+}
 command -v python3 >/dev/null 2>&1 || { echo "python3 is required." >&2; exit 1; }
 
 CODEX_PROFILE_REPO="$repo_dir" python3 - <<'PY'

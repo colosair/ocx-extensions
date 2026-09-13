@@ -34,15 +34,30 @@ logs in on its own.
 
 ## Setup on a new machine
 
-Requires `opencodex` (`ocx`) and `python3` already installed.
+You can set this up manually, or ask your Codex agent to do it for you.
+
+### Agent-driven setup (Recommended)
+
+Just paste this repo URL into a new Codex task and ask the agent to apply it:
+
+> https://github.com/colosair/ocx-extensions
+> Read the AGENTS.md in this repo and apply the setup to my current Codex environment.
+
+The agent will automatically install OpenCodex (if missing), verify your environment, prompt you to complete any needed OAuth logins, and apply the entire setup safely.
+
+### Manual setup
+
+Requires OpenCodex (`ocx`) and `python3` already installed.
 
 ```bash
 git clone <this-repo-url>
 cd ocx-extensions
 
-ocx login anthropic            # browser OAuth, creates the anthropic provider
-ocx login google-antigravity   # browser OAuth, creates the Antigravity provider
+# Log into required providers
+ocx login anthropic
+ocx login google-antigravity
 
+# Apply the setup
 ./apply.sh
 ```
 
