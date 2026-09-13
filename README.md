@@ -3,10 +3,12 @@
 Reproduces one Codex desktop setup on a new machine: the model picker list
 (order, visibility, display names) and the OpenCodex quota-bar skill.
 
-<p align="center">
-  <img src="docs/model-picker.png" alt="Codex model picker with the restored order" height="300">
-  <img src="docs/quota-bars.png" alt="ocx-quota gauge output" height="300">
-</p>
+<table>
+  <tr>
+    <td><img src="docs/model-picker.png" alt="Codex model picker with the restored order" height="300"></td>
+    <td><img src="docs/quota-bars.png" alt="ocx-quota gauge output" height="300"></td>
+  </tr>
+</table>
 
 ## What this repo is
 
