@@ -1,6 +1,6 @@
 ---
 name: ocx-quota
-description: Display current OpenCodex provider quotas as compact, aligned text gauge bars. Use when the user asks to view OpenAI, Anthropic, or Google Antigravity usage in the agreed terminal-style format.
+description: Display current OpenCodex provider quotas and remaining usage as compact gauge bars. Use when the user asks about 사용량, 쿼터, 한도, 남은 한도, 잔여량, 남은 사용량, provider usage, quota, or rate limits for OpenAI, Anthropic, or Google Antigravity.
 ---
 
 # Opencodex Quota Bars

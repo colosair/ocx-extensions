@@ -1,4 +1,4 @@
 interface:
-  display_name: "OCX Quota"
-  short_description: "Show aligned OpenCodex quota gauges"
-  default_prompt: "Use $ocx-quota to show my current provider quotas."
+  display_name: "OCX 사용량"
+  short_description: "OpenAI · Anthropic · Google 사용량과 남은 한도를 확인"
+  default_prompt: "Use $ocx-quota to show the current OpenCodex provider quotas."
