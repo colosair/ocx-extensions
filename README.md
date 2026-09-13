@@ -1,4 +1,4 @@
-# codex-profile
+# ocx-extensions
 
 Reproduces one Codex desktop setup on a new machine: the model picker list
 (order, visibility, display names) and the OpenCodex quota-bar skill.
@@ -26,8 +26,8 @@ logs in on its own.
 Requires `opencodex` (`ocx`) and `python3` already installed.
 
 ```bash
-git clone <this-repo-url> ~/codex-profile
-cd ~/codex-profile
+git clone <this-repo-url> ~/projects/ocx-extensions
+cd ~/projects/ocx-extensions
 
 ocx login anthropic            # browser OAuth, creates the anthropic provider
 ocx login google-antigravity   # browser OAuth, creates the Antigravity provider
