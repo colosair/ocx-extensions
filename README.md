@@ -3,6 +3,11 @@
 Reproduces one Codex desktop setup on a new machine: the model picker list
 (order, visibility, display names) and the OpenCodex quota-bar skill.
 
+<p align="center">
+  <img src="docs/model-picker.png" alt="Codex model picker with the restored order" height="300">
+  <img src="docs/quota-bars.png" alt="ocx-quota gauge output" height="300">
+</p>
+
 ## What this repo is
 
 The Codex model picker is built by `ocx sync` from a handful of declarative
@@ -45,20 +50,9 @@ list until it restarts.
 
 ## Expected result
 
-<table>
-  <tr>
-    <th>Model picker</th>
-    <th>Quota gauges</th>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/model-picker.png" alt="Codex model picker with the restored order" height="260"></td>
-    <td align="center"><img src="docs/quota-bars.png" alt="ocx-quota gauge output" height="260"></td>
-  </tr>
-  <tr>
-    <td>The picker has one deliberate order: OpenAI, Anthropic direct, Gemini, then Google-hosted third-party models. <code>modelPickerOrder</code> is the only order source; <code>ocx sync</code> regenerates the desktop catalog from it.</td>
-    <td><code>$ocx-quota</code> shows remaining quota and each reset time. <code>5h</code> and <code>Weekly</code> are rolling windows; <code>Fable</code> is its own model window; <code>Others</code> is the shared Google Antigravity pool for non-Gemini models.</td>
-  </tr>
-</table>
+The picker has one deliberate order: OpenAI, Anthropic direct, Gemini, then
+Google-hosted third-party models. `modelPickerOrder` is the only order source;
+`ocx sync` regenerates the desktop catalog from it.
 
 The model picker, top to bottom:
 
@@ -75,10 +69,12 @@ The `Google *` names mark models served through Antigravity rather than through
 the vendor directly. They spend the Antigravity shared pool, not the Anthropic
 subscription — which is why they are named apart from `Opus 5` / `Sonnet 5`.
 
-Then `$ocx-quota` prints live quota gauges for every connected
-provider. Providers that are not connected on that machine are simply absent
-from the output; that is not an error. It refreshes quota data when invoked, so
-the values are not a stale desktop-app cache.
+Then `$ocx-quota` prints live quota gauges for every connected provider. `5h`
+and `Weekly` are rolling windows, `Fable` is its own model window, and `Others`
+is the shared Google Antigravity pool for non-Gemini models. Providers that are
+not connected on that machine are simply absent from the output; that is not an
+error. It refreshes quota data when invoked, so the values are not a stale
+desktop-app cache.
 
 ## Updating the profile
 
