@@ -45,6 +45,8 @@ for path in PATHS:
     if value is None:
         print(f"skipped (absent): {path}")
         continue
+    if path in ("modelPickerOrder", "disabledModels") and isinstance(value, list):
+        value = [m for m in value if "/" not in m or m.split("/", 1)[0] in PROVIDERS]
     captured[path] = value
 
 out = {"requiredProviders": PROVIDERS, "config": captured}

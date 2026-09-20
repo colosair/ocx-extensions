@@ -21,7 +21,10 @@
       "google-antigravity/gpt-oss-120b-medium"
     ],
     "disabledModels": [
-      "gpt-5.3-codex-spark"
+      "gpt-5.3-codex-spark",
+      "anthropic/claude-haiku-4-5-20251001",
+      "google-antigravity/gemini-3.1-pro",
+      "google-antigravity/gpt-oss-120b-medium"
     ],
     "subagentModels": [
       "gpt-6-astra",
