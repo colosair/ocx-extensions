@@ -83,12 +83,14 @@ The model picker, top to bottom:
 
 ```
 GPT-6-Astra, GPT-5.6-Sol/Terra/Luna, GPT-5.5, GPT-6-Sol/Luna (native, Codex order)
-Fable 5.1, Opus 5.5, Sonnet 5, Haiku 4.5                    (Anthropic direct)
-Gemini 3.1 Pro, Gemini 3.8 Flash                            (Google Antigravity)
-Google Opus 4.6, Google Sonnet 4.6, Google GPT-OSS 120B     (Antigravity third-party)
+Fable 5.1, Opus 5.5, Sonnet 5                               (Anthropic direct)
+Gemini 3.8 Flash                                            (Google Antigravity)
+Google Opus 4.6, Google Sonnet 4.6                          (Antigravity third-party)
 ```
 
-`gpt-5.3-codex-spark` stays hidden.
+Hidden through `disabledModels`: `gpt-5.3-codex-spark`, Haiku 4.5, Gemini 3.1 Pro,
+and Google GPT-OSS 120B. They stay in `modelPickerOrder`, so removing one from
+`disabledModels` brings it back in its old position.
 
 The `Google *` names mark models served through Antigravity rather than through
 the vendor directly. They spend the Antigravity shared pool, not the Anthropic
