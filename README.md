@@ -72,15 +72,18 @@ list until it restarts.
 
 ## Expected result
 
-The picker has one deliberate order: OpenAI, Anthropic direct, Gemini, then
-Google-hosted third-party models. `modelPickerOrder` is the only order source;
-`ocx sync` regenerates the desktop catalog from it.
+Native Codex models always come first, in Codex's own order, so a newly released
+OpenAI model appears at the top without a profile change. `modelPickerOrder`
+lists only routed `<provider>/<model>` ids and orders everything after them:
+Anthropic direct, Gemini, then Google-hosted third-party models. Keep bare
+native ids out of it; one bare id switches ocx to full-picker ordering and pushes
+unlisted native models to the bottom. `ocx sync` regenerates the desktop catalog.
 
 The model picker, top to bottom:
 
 ```
-GPT-6-Astra, GPT-5.6-Sol, GPT-5.6-Terra, GPT-5.6-Luna, GPT-5.5
-Fable 5.1, Opus 5, Sonnet 5, Haiku 4.5                      (Anthropic direct)
+GPT-6-Astra, GPT-5.6-Sol/Terra/Luna, GPT-5.5, GPT-6-Sol/Luna (native, Codex order)
+Fable 5.1, Opus 5.5, Sonnet 5, Haiku 4.5                    (Anthropic direct)
 Gemini 3.1 Pro, Gemini 3.8 Flash                            (Google Antigravity)
 Google Opus 4.6, Google Sonnet 4.6, Google GPT-OSS 120B     (Antigravity third-party)
 ```
@@ -89,7 +92,7 @@ Google Opus 4.6, Google Sonnet 4.6, Google GPT-OSS 120B     (Antigravity third-p
 
 The `Google *` names mark models served through Antigravity rather than through
 the vendor directly. They spend the Antigravity shared pool, not the Anthropic
-subscription — which is why they are named apart from `Opus 5` / `Sonnet 5`.
+subscription — which is why they are named apart from `Opus 5.5` / `Sonnet 5`.
 
 Then `$ocx-quota` prints live quota gauges for every connected provider. `5h`
 and `Weekly` are rolling windows, `Fable` is its own model window, and `Others`

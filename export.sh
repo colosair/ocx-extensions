@@ -47,6 +47,9 @@ for path in PATHS:
         continue
     if path in ("modelPickerOrder", "disabledModels") and isinstance(value, list):
         value = [m for m in value if "/" not in m or m.split("/", 1)[0] in PROVIDERS]
+    if path == "modelPickerOrder" and isinstance(value, list):
+        # A bare native id switches ocx to full-picker ordering and sinks unlisted natives.
+        value = [m for m in value if "/" in m]
     captured[path] = value
 
 out = {"requiredProviders": PROVIDERS, "config": captured}
