@@ -1,7 +1,10 @@
 # ocx-extensions
 
-A thin layer on top of [OpenCodex](https://github.com/lidge-jun/opencodex) that
-does three things on any machine:
+OpenCodex discovers the models and you decide which ones are visible; ocx-extensions
+keeps the routed models tidy in the Codex picker and shows your quota.
+
+It is a thin layer on top of [OpenCodex](https://github.com/lidge-jun/opencodex)
+that does three things on any machine:
 
 1. Shows OpenCodex's long model ids in the Codex desktop picker under short,
    readable names (`anthropic/claude-opus-5-5` → `Opus 5.5`).
@@ -27,38 +30,51 @@ does three things on any machine:
 | --- | --- | --- |
 | Which models exist | OpenCodex live discovery | provider `/models` calls |
 | Which models are hidden | You, through OpenCodex | `disabledModels` in `~/.opencodex/config.json` |
-| Readable names and picker order | this repo | rules in `policy.json`, written to `modelDisplayNames` / `modelPickerOrder` |
+| Native model order, default and subagent models | OpenCodex / Codex | untouched by this repo |
+| Names of `policy.json` providers' models, routed picker order | this repo | rules in `policy.json`, written to `modelDisplayNames` / `modelPickerOrder` |
+| Periodic reconcile | this repo | OS scheduler entry installed by `apply.sh` |
 | Quota display | this repo | `skills/ocx-quota` |
 
 This repo stores no model list. `policy.json` holds rules (family order, name
-prefixes) and a few operator settings; the concrete ids always come from the live
-catalog.
+prefixes), a few operator settings, and one intentional hide exception
+(`ensureDisabled`); the concrete ids always come from the live catalog.
 
 ## How a new model shows up
 
 ```
 provider releases claude-opus-5-6
-→ OpenCodex catalog auto-refresh (every 15 min) adds it to the Codex catalog, visible
-→ scripts/reconcile-models.py names it "Opus 5.6" and slots it after "Opus 5.5"
+→ OpenCodex catalogAutoRefresh (every 15 min) discovers it; it is visible
+→ the scheduled reconcile (every 15 min) names it "Opus 5.6", slots it after "Opus 5.5",
+  and runs ocx sync
 → quit and reopen Codex: the picker shows it
+(no repo edit)
 ```
 
 New models are visible by default (`modelDiscovery.newModelPolicy = "on"`). Older
 generations stay; nothing is hidden because something newer arrived. If you don't
 want a model, hide it yourself (below).
 
-`catalogAutoRefresh` is OpenCodex's own timer; it makes a new model visible without
-a manual `ocx sync`, but it does not run this repo's naming. Until
-`reconcile-models.py` runs, a brand-new model appears under OpenCodex's name
-(the provider's display name, or the raw `provider/model` id). Run it any time:
+OpenCodex's timer does not call this repo, so `apply.sh` registers
+`scripts/reconcile-models.py` with the OS scheduler on the same 15-minute cadence
+(`scripts/install-auto-reconcile.py`). For up to one interval a brand-new model shows
+OpenCodex's own name. A run with nothing to change writes nothing; a run while the
+proxy is down exits without touching the config.
+
+| OS | Entry | Remove with |
+| --- | --- | --- |
+| Windows | Task Scheduler task `ocx-extensions-reconcile` (runs `pythonw`, no window) | `schtasks /Delete /TN ocx-extensions-reconcile /F` |
+| macOS | `~/Library/LaunchAgents/com.ocx-extensions.reconcile.plist` | `launchctl unload <plist>`, then delete the file |
+| Linux | one user crontab line tagged `# ocx-extensions-reconcile` | `crontab -l \| grep -v ocx-extensions-reconcile \| crontab -` |
+
+Re-running `apply.sh` replaces the entry with the current repo path and Python, so
+there is always one. macOS and Linux runs log to `$TMPDIR/ocx-extensions-reconcile.log`.
+
+To apply names right away, or to troubleshoot:
 
 ```bash
 python3 scripts/reconcile-models.py          # names + order, then ocx sync if anything changed
 python3 scripts/reconcile-models.py --check  # exit 1 if something is out of date
 ```
-
-It is idempotent, so it is safe on a schedule if you want names applied without
-thinking about it, e.g. cron: `*/15 * * * * cd /path/to/ocx-extensions && python3 scripts/reconcile-models.py`.
 
 ## How names are made
 
@@ -77,16 +93,21 @@ For each live model, first match wins:
 4. **Raw id.** If the id cannot be parsed safely, OpenCodex shows it as-is.
 
 A model is never hidden because it could not be named. If two ids would read the
-same, the stripped suffix is kept (`Google Opus 4.6 Thinking`). Names already in
-`modelDisplayNames` are never overwritten, so a rename you make in the OpenCodex
-dashboard sticks. To regenerate one, remove it with
-`ocx config unset providers.<provider>.modelDisplayNames.<model-id>` and re-run.
+same, the stripped suffix is kept (`Google Opus 4.6 Thinking`).
 
-Order within the picker: native Codex models first in Codex's own order (this repo
-never adds bare native ids to `modelPickerOrder`), then Anthropic (Fable, Opus,
-Sonnet, Haiku, other families), then Google Antigravity (Gemini, Google Opus,
-Google Sonnet, Google GPT-OSS, other families), each family in ascending version.
-Entries for other providers you added yourself keep their order after these.
+For the providers listed in `policy.json`, `modelDisplayNames` is generated output:
+every run recomputes the whole map, fixes names an older rule got wrong, and drops
+ids that left the catalog. A rename made in the OpenCodex dashboard for those
+providers is replaced on the next run; change the rules in `policy.json` instead.
+
+Order within the picker: native Codex models first in Codex's own order. This repo
+never adds bare native ids to `modelPickerOrder`, because one bare id would switch
+OpenCodex to ordering the whole picker. Then Anthropic (Fable, Opus, Sonnet, Haiku,
+other families), then Google Antigravity (Gemini, Google Opus, Google Sonnet, Google
+GPT-OSS, other families), each family in ascending version. Then every other routed
+model, so a new model from another provider cannot land outside the list and jump
+ahead: saved order is kept, a new model goes to the end of its provider's group, and
+a new provider goes after the known ones.
 
 ## Hiding a model
 
@@ -98,9 +119,9 @@ ocx models enable  anthropic/claude-opus-5-5
 ```
 
 or the model switches in the OpenCodex dashboard (`ocx gui`). The choice is stored
-in `disabledModels` in `~/.opencodex/config.json`. Reconcile never removes
-entries from it, and a disabled model keeps its slot in the order, so enabling it
-again puts it back where it was.
+in `disabledModels` in `~/.opencodex/config.json`. The scheduled reconcile never
+writes `disabledModels`, and a disabled model keeps its slot in the order, so
+enabling it again puts it back where it was.
 
 ## Setup on a new machine
 
@@ -129,12 +150,16 @@ ocx login google-antigravity
 discovery fails. Otherwise it:
 
 - applies the settings in `policy.json` (`newModelPolicy: on`, catalog auto-refresh
-  every 15 minutes, subagent models, default models);
+  every 15 minutes, Antigravity alias and mode) and appends `ensureDisabled`;
+  existing default and subagent models are left as they are;
 - migrates a legacy `providers.*.selectedModels` allowlist: models it was hiding
   that OpenCodex already knew about become `disabledModels` entries, the allowlist
   is removed, and models it hid that OpenCodex had not seen yet become visible;
-- names and orders the live catalog, runs `ocx sync`, installs `skills/ocx-quota`
-  into `$CODEX_HOME/skills`, and checks that a second pass finds nothing to change.
+- names and orders the live catalog, runs `ocx sync`, and installs `skills/ocx-quota`
+  into `$CODEX_HOME/skills`;
+- registers the 15-minute reconcile with the OS scheduler (a failure here prints a
+  warning and setup continues);
+- checks that a second pass finds nothing to change.
 
 It is safe to re-run. Then quit and reopen the Codex desktop app; its model list is
 held in memory until it restarts.

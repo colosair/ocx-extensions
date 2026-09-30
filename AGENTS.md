@@ -1,7 +1,7 @@
 # Instructions for agents
 
-This repo is a thin policy layer over OpenCodex: it turns the live model catalog
-into readable picker names and a stable order, and installs the `ocx-quota` skill.
+OpenCodex discovers the models and the user decides which ones are visible;
+ocx-extensions keeps the routed models tidy in the Codex picker and shows quota.
 It must work on a new machine from just the repo URL.
 
 Read these rules and `README.md` before acting.
@@ -22,17 +22,34 @@ When asked to apply this repo, follow this exact sequence:
    - If either is missing, **stop and ask the user to log in**. Do not try to bypass OAuth or create providers by hand-editing config files. Provide the exact commands for the user to run (e.g., `ocx login anthropic`, `ocx login google-antigravity`). Tell the user to let you know when they are done.
 4. **Apply Configuration:** Once providers are ready, execute `./apply.sh` in the repository root.
    If it reports that the proxy is not running, ask the user to run `ocx start`.
-5. **Verify and Wrap up:** Ensure `./apply.sh` succeeds (its last step is `reconcile-models.py --check`). Tell the user to quit and reopen the Codex desktop app so the new model picker loads.
+5. **Verify and Wrap up:** Ensure `./apply.sh` succeeds (its last step is `reconcile-models.py --check`). If it printed the scheduler WARNING, report it; setup still counts as applied. Tell the user to quit and reopen the Codex desktop app so the new model picker loads.
 
 ## Ownership rules
 
-- **OpenCodex owns the model inventory.** Do not add concrete model ids to
-  `policy.json` or any other repo file. Do not turn generated model inventory
-  (live ids, generated `modelPickerOrder`, generated `modelDisplayNames`) back
-  into repository state. There is no export step, on purpose.
-- **The user owns visibility.** Do not overwrite, reset, or regenerate user
-  `disabledModels`. Code here may only append to it (the one-time legacy migration
-  and `ensureDisabled` in `policy.json`). Never enable a model the user disabled.
+OpenCodex (and the user through it) owns:
+- the model inventory (live discovery) and native model ordering;
+- visibility: `disabledModels`;
+- provider, default-model, and subagent settings not listed in `policy.json`.
+
+ocx-extensions owns:
+- `providers.<name>.modelDisplayNames` for the providers in `policy.json` (generated, authoritative);
+- the routed `modelPickerOrder` (every live routed model);
+- explicit hide exceptions (`ensureDisabled`, append-only);
+- the quota skill and the periodic reconcile scheduler entry.
+
+Rules:
+
+- Never store discovered inventory or generated model lists in git. Do not turn live
+  ids, generated `modelPickerOrder`, or generated `modelDisplayNames` back into
+  repository state. There is no export step, on purpose.
+- Exact model ids in `policy.json` are allowed only for intentional operator
+  exceptions such as `ensureDisabled`. Do not pin `subagentModels` or
+  `providers.*.defaultModel` there.
+- Never overwrite `disabledModels` during ordinary reconcile. Only `--bootstrap` may
+  append to it (legacy migration and `ensureDisabled`). Never enable a model the user disabled.
+- Never preserve stale generated display names merely because they already exist;
+  the managed map is recomputed every run.
+- Never add bare native ids to `modelPickerOrder`.
 - **Do not restore static `selectedModels`.** An allowlist hides every future model.
   `apply.sh` migrates it to `disabledModels`; do not reintroduce one.
 - **New models stay visible by default.** Do not add approval steps, quarantine,

@@ -56,6 +56,13 @@ for name in sorted(os.listdir(skills_src)):
     print(f"installed skill {name}")
 PY
 
+# Keep names and order current as OpenCodex discovers models. Optional: a failure here
+# leaves the picker already applied above, so warn and continue.
+"$py" "$repo_dir/scripts/install-auto-reconcile.py" || {
+  echo "WARNING: Automatic model reconciliation was not registered." >&2
+  echo "Run scripts/reconcile-models.py manually or fix the scheduler setup." >&2
+}
+
 # Verify: a second reconcile pass must find nothing to change.
 "$py" "$repo_dir/scripts/reconcile-models.py" --check
 

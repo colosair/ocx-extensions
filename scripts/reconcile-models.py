@@ -2,11 +2,13 @@
 """Refine the OpenCodex model catalog for the Codex picker.
 
 OpenCodex owns the model inventory (live discovery) and visibility (disabledModels).
-This script only derives readable display names and a stable picker order from the
-live catalog and policy.json. It never enables a model and never rewrites
-disabledModels outside the one-time --bootstrap migration, which only adds entries.
+This script owns two derived outputs, recomputed from the live catalog every run:
+  - providers.<managed>.modelDisplayNames  (short names for the policy.json providers)
+  - modelPickerOrder                       (every live routed model; never bare native ids)
+It never enables a model and never writes disabledModels outside --bootstrap, which
+only appends (legacy selectedModels migration and policy ensureDisabled).
 
-  reconcile-models.py              name + order new models, ocx sync when changed
+  reconcile-models.py              recompute names + order, ocx sync when changed
   reconcile-models.py --bootstrap  also: provider check, policy settings, legacy migration
   reconcile-models.py --check      exit 1 if names/order are not what reconcile would write
 """
@@ -129,14 +131,13 @@ def display_name_for(row: Mapping[str, Any], rules: Mapping[str, Any]) -> Option
     return humanize(model_id, rules)
 
 
-def build_display_names(rows: Sequence[Mapping[str, Any]], rules: Mapping[str, Any],
-                        existing: Mapping[str, str]) -> Dict[str, str]:
-    """Existing names are kept as-is (they may be user edits); only unnamed ids are filled."""
-    names = dict(existing)
-    generated = {r["id"]: n for r in rows if r["id"] not in existing
-                 for n in [display_name_for(r, rules)] if n}
-    shown = Counter(names.get(r["id"]) or generated.get(r["id"]) or r.get("displayName") or r["id"]
-                    for r in rows)
+def build_display_names(rows: Sequence[Mapping[str, Any]], rules: Mapping[str, Any]) -> Dict[str, str]:
+    """The complete override map for one provider. Rows left to OpenCodex are not listed."""
+    generated = {r["id"]: n for r in rows for n in [display_name_for(r, rules)] if n}
+    shown = Counter(generated.get(r["id"])
+                    or (r.get("displayNameSource") == "provider" and r.get("displayName"))
+                    or r["id"] for r in rows)
+    names = {}
     for model_id, name in generated.items():
         qualifiers = split_qualifiers(model_id)[1]
         if shown[name] > 1 and qualifiers:
@@ -150,26 +151,58 @@ def _slug(row: Mapping[str, Any], provider: str) -> str:
     return row.get("namespaced") or f"{provider}/{row['id']}"
 
 
-def build_desired_config(cfg: Mapping[str, Any], lives: Mapping[str, Sequence[Mapping[str, Any]]],
+def routed_rows(rows: Any) -> List[Dict[str, Any]]:
+    """Routed rows of the full live catalog. Native rows are Codex's to order."""
+    if not isinstance(rows, list):
+        raise OcxError("ocx models live: expected a JSON list")
+    return [r for r in rows if isinstance(r, dict) and isinstance(r.get("id"), str)
+            and isinstance(r.get("provider"), str) and not r.get("native")
+            and "/" in _slug(r, r["provider"])]
+
+
+def managed_rows(routed: Sequence[Mapping[str, Any]], providers: Sequence[str]) -> Dict[str, List[Dict[str, Any]]]:
+    lives = {p: [dict(r) for r in routed if r["provider"] == p] for p in providers}
+    for provider, rows in lives.items():
+        if not rows:
+            # An empty roster is far more likely a failed discovery than a provider with no models.
+            raise OcxError(f"ocx models live: no models returned for {provider}")
+    return lives
+
+
+def build_desired_config(cfg: Mapping[str, Any], routed: Sequence[Mapping[str, Any]],
                          policy: Mapping[str, Any]) -> Dict[str, Any]:
-    """Config paths whose value differs from what the picker policy wants."""
+    """Config paths whose value differs from what the picker policy wants (None = unset)."""
     changes: Dict[str, Any] = {}
     head: List[str] = []
+    managed = set()
     for rules in policy["providers"]:
         provider = rules["name"]
-        if provider not in lives:
+        rows = [r for r in routed if r["provider"] == provider]
+        if not rows:
             continue
-        rows = lives[provider]
+        managed.add(provider)
         path = f"providers.{provider}.modelDisplayNames"
-        existing = read_path(cfg, path) or {}
-        names = build_display_names(rows, rules, existing)
-        if names != existing:
-            changes[path] = names
+        names = build_display_names(rows, rules)
+        if names != (read_path(cfg, path) or {}):
+            changes[path] = names or None
         head += [_slug(r, provider) for r in sorted(rows, key=lambda r: sort_key_for(r["id"], rules))]
-    # Unmanaged entries (other providers, bare native ids a user added) keep their order after ours.
+
+    # Every other routed model follows, so none is left outside the order to jump ahead of
+    # the managed band. Saved relative order wins; new models go to the end of their provider
+    # group, new providers after known ones. Saved entries not live right now are kept, since
+    # their provider may just be failing discovery. Bare native ids are dropped.
     current = cfg.get("modelPickerOrder") or []
-    tail = [s for s in current if "/" not in s or s.split("/", 1)[0] not in lives]
-    order = head + [s for s in tail if s not in head]
+    position = {slug: i for i, slug in reversed(list(enumerate(current)))}
+    provider_position: Dict[str, int] = {}
+    for slug in current:
+        provider_position.setdefault(slug.split("/", 1)[0], position[slug])
+    others = dict.fromkeys(
+        [s for s in current if "/" in s and s.split("/", 1)[0] not in managed]
+        + [_slug(r, r["provider"]) for r in routed if r["provider"] not in managed])
+    missing = len(current)
+    tail = sorted(others, key=lambda s: (provider_position.get(s.split("/", 1)[0], missing),
+                                         s.split("/", 1)[0], position.get(s, missing), s))
+    order = head + tail
     if order != current:
         changes["modelPickerOrder"] = order
     return changes
@@ -211,17 +244,6 @@ def bootstrap_changes(cfg: Mapping[str, Any], lives: Mapping[str, Sequence[Mappi
     return changes, unsets
 
 
-def validate_rows(provider: str, rows: Any) -> List[Dict[str, Any]]:
-    if not isinstance(rows, list):
-        raise OcxError(f"ocx models live --provider {provider}: expected a JSON list")
-    valid = [r for r in rows if isinstance(r, dict) and isinstance(r.get("id"), str)
-             and r.get("provider", provider) == provider]
-    if not valid:
-        # An empty roster is far more likely a failed discovery than a provider with no models.
-        raise OcxError(f"ocx models live --provider {provider}: no models returned")
-    return valid
-
-
 # ---------------------------------------------------------------- OpenCodex I/O
 
 class OcxError(RuntimeError):
@@ -234,8 +256,10 @@ class Ocx:
 
     def _run(self, *args: str, timeout: int = 60) -> str:
         try:
+            # CREATE_NO_WINDOW: a scheduled run under pythonw must not flash a console per call.
             result = subprocess.run([self.exe, *args], capture_output=True, text=True,
-                                    encoding="utf-8", errors="replace", timeout=timeout)
+                                    encoding="utf-8", errors="replace", timeout=timeout,
+                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except subprocess.TimeoutExpired as error:
             raise OcxError(f"ocx {' '.join(args[:3])}: timed out") from error
         if result.returncode != 0:
@@ -251,8 +275,8 @@ class Ocx:
     def config(self) -> Dict[str, Any]:
         return self._json("config", "show")
 
-    def live(self, provider: str) -> Any:
-        return self._json("models", "live", "--provider", provider, "--json")
+    def live_all(self) -> Any:
+        return self._json("models", "live", "--json")
 
     def set(self, path: str, value: Any) -> None:
         self._run("config", "set", path, json.dumps(value, ensure_ascii=False))
@@ -289,13 +313,13 @@ def main(argv: Optional[Sequence[str]] = None, ocx: Any = None,
             for provider in missing:
                 print(f"  ocx login {provider}", file=sys.stderr)
             return 1
-        lives = {r["name"]: validate_rows(r["name"], ocx.live(r["name"]))
-                 for r in policy["providers"] if r["name"] not in missing}
+        routed = routed_rows(ocx.live_all())
+        lives = managed_rows(routed, [r["name"] for r in policy["providers"] if r["name"] not in missing])
     except OcxError as error:
         print(f"reconcile skipped, config untouched: {error}", file=sys.stderr)
         return 1
 
-    changes = build_desired_config(cfg, lives, policy)
+    changes = build_desired_config(cfg, routed, policy)
     if args.check:
         for path in changes:
             print(f"out of date: {path}", file=sys.stderr)
@@ -314,8 +338,12 @@ def main(argv: Optional[Sequence[str]] = None, ocx: Any = None,
 
     try:
         for path, value in changes.items():
-            ocx.set(path, value)
-            print(f"set {path}")
+            if value is None:
+                ocx.unset(path)
+                print(f"unset {path}")
+            else:
+                ocx.set(path, value)
+                print(f"set {path}")
         for path in unsets:
             ocx.unset(path)
             print(f"unset {path}")
