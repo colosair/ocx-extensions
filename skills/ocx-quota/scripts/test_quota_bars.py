@@ -56,6 +56,22 @@ class QuotaBarsTest(unittest.TestCase):
         self.assertIn("정보 없음", quota_bars.render_window(window))
         self.assertNotIn("100% 남음", quota_bars.render_window(window))
 
+    def test_unknown_windows_and_model_fields_still_render(self):
+        # Quota is keyed by provider/window, so a new model generation needs no code change here.
+        reports = [{
+            "provider": "google-antigravity",
+            "models": ["gemini-9-flash", "claude-nova-6"],
+            "quota": {"customWindows": [
+                {"label": "Nova", "percent": 50, "resetAt": 1},
+                {"label": "Gem", "percent": 20, "resetAt": 1},
+            ]},
+        }]
+
+        section = quota_bars.build_sections(reports)[0]
+
+        self.assertEqual([window.label for window in section.windows], ["Gemini 5h", "Nova"])
+        self.assertIn("50% 남음", quota_bars.render_sections([section]))
+
 
 if __name__ == "__main__":
     unittest.main()

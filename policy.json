@@ -1,0 +1,27 @@
+{
+  "providers": [
+    {
+      "name": "anthropic",
+      "families": ["claude-fable", "claude-opus", "claude-sonnet", "claude-haiku"],
+      "stripPrefix": "claude-"
+    },
+    {
+      "name": "google-antigravity",
+      "families": ["gemini", "claude-opus", "claude-sonnet", "gpt-oss"],
+      "stripPrefix": "claude-",
+      "namePrefix": "Google ",
+      "namePrefixSkip": ["gemini"]
+    }
+  ],
+  "ensureDisabled": ["gpt-5.3-codex-spark"],
+  "config": {
+    "modelDiscovery.newModelPolicy": "on",
+    "catalogAutoRefresh": { "enabled": true, "intervalMinutes": 15 },
+    "subagentModels": ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"],
+    "showCodexSparkQuota": false,
+    "providers.anthropic.defaultModel": "claude-sonnet-5",
+    "providers.google-antigravity.defaultModel": "gemini-3.8-flash",
+    "providers.google-antigravity.alias": "agy",
+    "providers.google-antigravity.googleMode": "cloud-code-assist"
+  }
+}

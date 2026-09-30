@@ -1,7 +1,14 @@
 # ocx-extensions
 
-Reproduces one Codex desktop setup on a new machine: the model picker list
-(order, visibility, display names) and the OpenCodex quota-bar skill.
+A thin layer on top of [OpenCodex](https://github.com/lidge-jun/opencodex) that
+does three things on any machine:
+
+1. Shows OpenCodex's long model ids in the Codex desktop picker under short,
+   readable names (`anthropic/claude-opus-5-5` → `Opus 5.5`).
+2. Keeps the picker in a stable provider/family order, while you hide the models
+   you don't want with OpenCodex's own model toggle.
+3. Installs the `$ocx-quota` skill, which prints live OpenAI / Anthropic / Google
+   Antigravity quota gauges.
 
 <table>
   <tr>
@@ -14,116 +21,149 @@ Reproduces one Codex desktop setup on a new machine: the model picker list
   </tr>
 </table>
 
-## What this repo is
+## Who owns what
 
-The Codex model picker is built by `ocx sync` from a handful of declarative
-fields in `~/.opencodex/config.json`. The files it generates —
-`~/.codex/opencodex-catalog.json` and `~/.codex/models_cache.json` — are
-rebuilt on every sync, so they are **not** stored here. Copying them would be
-overwritten on the next sync and would carry another machine's account rows.
+| Concern | Owner | Where it lives |
+| --- | --- | --- |
+| Which models exist | OpenCodex live discovery | provider `/models` calls |
+| Which models are hidden | You, through OpenCodex | `disabledModels` in `~/.opencodex/config.json` |
+| Readable names and picker order | this repo | rules in `policy.json`, written to `modelDisplayNames` / `modelPickerOrder` |
+| Quota display | this repo | `skills/ocx-quota` |
 
-What travels between machines:
+This repo stores no model list. `policy.json` holds rules (family order, name
+prefixes) and a few operator settings; the concrete ids always come from the live
+catalog.
 
-| File | Contents |
-| --- | --- |
-| `profile.json` | The config paths that define picker order, hidden models, and display names |
-| `skills/ocx-quota/` | The quota-gauge skill, copied into `$CODEX_HOME/skills` |
+## How a new model shows up
 
-Accounts, OAuth tokens, ports, and API keys are never stored here. Each machine
-logs in on its own.
+```
+provider releases claude-opus-5-6
+→ OpenCodex catalog auto-refresh (every 15 min) adds it to the Codex catalog, visible
+→ scripts/reconcile-models.py names it "Opus 5.6" and slots it after "Opus 5.5"
+→ quit and reopen Codex: the picker shows it
+```
+
+New models are visible by default (`modelDiscovery.newModelPolicy = "on"`). Older
+generations stay; nothing is hidden because something newer arrived. If you don't
+want a model, hide it yourself (below).
+
+`catalogAutoRefresh` is OpenCodex's own timer; it makes a new model visible without
+a manual `ocx sync`, but it does not run this repo's naming. Until
+`reconcile-models.py` runs, a brand-new model appears under OpenCodex's name
+(the provider's display name, or the raw `provider/model` id). Run it any time:
+
+```bash
+python3 scripts/reconcile-models.py          # names + order, then ocx sync if anything changed
+python3 scripts/reconcile-models.py --check  # exit 1 if something is out of date
+```
+
+It is idempotent, so it is safe on a schedule if you want names applied without
+thinking about it, e.g. cron: `*/15 * * * * cd /path/to/ocx-extensions && python3 scripts/reconcile-models.py`.
+
+## How names are made
+
+For each live model, first match wins:
+
+1. **Family rule.** Ids in a family listed in `policy.json` are shortened by rule:
+   the vendor prefix is dropped, version digits are joined, and date, `-thinking`,
+   and tier suffixes (`-low`, `-medium`, `-high`, `-tiered`) are removed.
+   `claude-haiku-4-5-20251001` → `Haiku 4.5`, `gemini-3.9-flash` → `Gemini 3.9 Flash`.
+   Non-Gemini models on Antigravity get a `Google` prefix
+   (`claude-opus-4-6-thinking` → `Google Opus 4.6`), because they spend the
+   Antigravity pool rather than your Anthropic subscription.
+2. **Provider name.** An unknown family keeps the display name the provider or
+   OpenCodex already supplies.
+3. **Generic humanizer.** Otherwise the same shortening applies (`claude-nova-6` → `Nova 6`).
+4. **Raw id.** If the id cannot be parsed safely, OpenCodex shows it as-is.
+
+A model is never hidden because it could not be named. If two ids would read the
+same, the stripped suffix is kept (`Google Opus 4.6 Thinking`). Names already in
+`modelDisplayNames` are never overwritten, so a rename you make in the OpenCodex
+dashboard sticks. To regenerate one, remove it with
+`ocx config unset providers.<provider>.modelDisplayNames.<model-id>` and re-run.
+
+Order within the picker: native Codex models first in Codex's own order (this repo
+never adds bare native ids to `modelPickerOrder`), then Anthropic (Fable, Opus,
+Sonnet, Haiku, other families), then Google Antigravity (Gemini, Google Opus,
+Google Sonnet, Google GPT-OSS, other families), each family in ascending version.
+Entries for other providers you added yourself keep their order after these.
+
+## Hiding a model
+
+Use OpenCodex's toggle; this repo has no hide list of its own.
+
+```bash
+ocx models disable anthropic/claude-opus-5-5
+ocx models enable  anthropic/claude-opus-5-5
+```
+
+or the model switches in the OpenCodex dashboard (`ocx gui`). The choice is stored
+in `disabledModels` in `~/.opencodex/config.json`. Reconcile never removes
+entries from it, and a disabled model keeps its slot in the order, so enabling it
+again puts it back where it was.
 
 ## Setup on a new machine
 
-You can set this up manually, or ask your Codex agent to do it for you.
+### Agent-driven setup (recommended)
 
-### Agent-driven setup (Recommended)
-
-Just paste this repo URL into a new Codex task and ask the agent to apply it:
+Paste this into a new Codex task:
 
 > https://github.com/colosair/ocx-extensions
 > Read the AGENTS.md in this repo and apply the setup to my current Codex environment.
 
-The agent will automatically install OpenCodex (if missing), verify your environment, prompt you to complete any needed OAuth logins, and apply the entire setup safely.
-
 ### Manual setup
 
-Requires OpenCodex (`ocx`) and `python3` already installed.
-OpenCodex: https://github.com/lidge-jun/opencodex
+Requires OpenCodex (`ocx`, proxy running) and Python 3.
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/colosair/ocx-extensions
 cd ocx-extensions
 
-# Log into required providers
 ocx login anthropic
 ocx login google-antigravity
 
-# Apply the setup
 ./apply.sh
 ```
 
-`apply.sh` refuses to run until both providers exist, then applies every setting
-through `ocx config set`, installs the skill, runs `ocx sync`, and verifies the
-resulting order matches `profile.json`. It is safe to re-run.
+`apply.sh` stops before writing anything if a provider login is missing or live
+discovery fails. Otherwise it:
 
-Finally, quit and reopen the Codex desktop app. Its model list is held in memory
-by the background `app-server` process, so a running app keeps showing the old
-list until it restarts.
+- applies the settings in `policy.json` (`newModelPolicy: on`, catalog auto-refresh
+  every 15 minutes, subagent models, default models);
+- migrates a legacy `providers.*.selectedModels` allowlist: models it was hiding
+  that OpenCodex already knew about become `disabledModels` entries, the allowlist
+  is removed, and models it hid that OpenCodex had not seen yet become visible;
+- names and orders the live catalog, runs `ocx sync`, installs `skills/ocx-quota`
+  into `$CODEX_HOME/skills`, and checks that a second pass finds nothing to change.
 
-## Expected result
+It is safe to re-run. Then quit and reopen the Codex desktop app; its model list is
+held in memory until it restarts.
 
-Native Codex models always come first, in Codex's own order, so a newly released
-OpenAI model appears at the top without a profile change. `modelPickerOrder`
-lists only routed `<provider>/<model>` ids and orders everything after them:
-Anthropic direct, Gemini, then Google-hosted third-party models. Keep bare
-native ids out of it; one bare id switches ocx to full-picker ordering and pushes
-unlisted native models to the bottom. `ocx sync` regenerates the desktop catalog.
+## Quota gauges
 
-The model picker, top to bottom:
+`$ocx-quota` runs `ocx provider quota --refresh --json` and prints a gauge per
+provider window. `5h` and `Weekly` are rolling windows, `Fable` is its own model
+window, and `Others` is the shared Google Antigravity pool for non-Gemini models.
+Providers that are not connected on the machine are simply absent. It works per
+provider and window, so new model generations need no change there.
 
-```
-GPT-6-Astra, GPT-5.6-Sol/Terra/Luna, GPT-5.5, GPT-6-Sol/Luna (native, Codex order)
-Fable 5.1, Opus 5.5, Sonnet 5                               (Anthropic direct)
-Gemini 3.8 Flash                                            (Google Antigravity)
-Google Opus 4.6, Google Sonnet 4.6                          (Antigravity third-party)
-```
-
-Hidden through `disabledModels`: `gpt-5.3-codex-spark`, Haiku 4.5, Gemini 3.1 Pro,
-and Google GPT-OSS 120B. They stay in `modelPickerOrder`, so removing one from
-`disabledModels` brings it back in its old position.
-
-The `Google *` names mark models served through Antigravity rather than through
-the vendor directly. They spend the Antigravity shared pool, not the Anthropic
-subscription — which is why they are named apart from `Opus 5.5` / `Sonnet 5`.
-
-Then `$ocx-quota` prints live quota gauges for every connected provider. `5h`
-and `Weekly` are rolling windows, `Fable` is its own model window, and `Others`
-is the shared Google Antigravity pool for non-Gemini models. Providers that are
-not connected on that machine are simply absent from the output; that is not an
-error. It refreshes quota data when invoked, so the values are not a stale
-desktop-app cache.
-
-## Updating the profile
-
-After changing model order, visibility, or names on the source machine:
+## Tests
 
 ```bash
-./export.sh   # rewrites profile.json from the live config
-git commit -am "update model profile"
+python3 -B -m unittest discover -s scripts
+python3 -B -m unittest discover -s skills/ocx-quota/scripts
 ```
-
-To update the skill, copy it back into `skills/` and commit.
 
 ## Troubleshooting
 
-**`Missing providers`** — the OAuth login did not create the provider entry.
-Verify with `ocx provider list`, and add it from the OpenCodex dashboard
-(`ocx gui`) if the login alone did not register it.
+**`Missing providers`**: log in with the printed `ocx login` command, confirm with
+`ocx provider list`, and re-run.
 
-**Picker order unchanged after apply** — the desktop app was not restarted.
-`ocx sync --restart-codex` restarts only the background app-server, but it
-interrupts any in-flight turn.
+**`reconcile skipped, config untouched: ... Proxy is not running`**: start it with
+`ocx start` and re-run.
 
-**A model is missing from the picker** — that model is not available on the new
-account. `apply.sh` keeps the rest of the order intact; check
-`ocx models live --provider <name>` to see what the account can actually reach.
+**Picker unchanged after apply**: the desktop app was not restarted.
+
+**The OpenCodex dashboard shows old names or toggles after apply**: `ocx config set`
+writes the config file, and a running proxy keeps its in-memory copy until it
+restarts. The Codex catalog written by `ocx sync` is already correct.
