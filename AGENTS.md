@@ -54,6 +54,9 @@ Rules:
   `apply.sh` migrates it to `disabledModels`; do not reintroduce one.
 - **New models stay visible by default.** Do not add approval steps, quarantine,
   "latest only" filters, or auto-hiding of older generations.
+- Register the scheduler only through `scripts/install-auto-reconcile.py` (run by
+  `apply.sh`); it replaces its single entry. Do not add a second task, agent, or cron line,
+  and never make the scheduled run restart the proxy or Codex.
 - To change naming or ordering, edit the rules in `policy.json` or the pure functions
   in `scripts/reconcile-models.py`, and extend `scripts/test_reconcile_models.py`.
 

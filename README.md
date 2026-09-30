@@ -56,9 +56,13 @@ want a model, hide it yourself (below).
 
 OpenCodex's timer does not call this repo, so `apply.sh` registers
 `scripts/reconcile-models.py` with the OS scheduler on the same 15-minute cadence
-(`scripts/install-auto-reconcile.py`). For up to one interval a brand-new model shows
-OpenCodex's own name. A run with nothing to change writes nothing; a run while the
-proxy is down exits without touching the config.
+(`scripts/install-auto-reconcile.py`). The two timers are independent: OpenCodex can
+take up to one refresh interval to discover a model, and after discovery
+ocx-extensions can take up to one reconcile interval to apply its short name and
+routed picker order, so about 30 minutes in the worst case. The model is usable as
+soon as it is discovered; only its name and position wait for the next reconcile.
+A run with nothing to change writes nothing; a run while the proxy is down exits
+without touching the config. Scheduled runs never restart the proxy or Codex.
 
 | OS | Entry | Remove with |
 | --- | --- | --- |
@@ -68,6 +72,8 @@ proxy is down exits without touching the config.
 
 Re-running `apply.sh` replaces the entry with the current repo path and Python, so
 there is always one. macOS and Linux runs log to `$TMPDIR/ocx-extensions-reconcile.log`.
+Windows may defer the scheduled reconcile while running on battery power, depending
+on Task Scheduler power settings.
 
 To apply names right away, or to troubleshoot:
 
@@ -120,8 +126,8 @@ ocx models enable  anthropic/claude-opus-5-5
 
 or the model switches in the OpenCodex dashboard (`ocx gui`). The choice is stored
 in `disabledModels` in `~/.opencodex/config.json`. The scheduled reconcile never
-writes `disabledModels`, and a disabled model keeps its slot in the order, so
-enabling it again puts it back where it was.
+writes `disabledModels`, so a hidden model stays hidden until you enable it. It
+keeps its slot in the order, so enabling it again puts it back where it was.
 
 ## Setup on a new machine
 

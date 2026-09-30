@@ -274,6 +274,10 @@ class MigrationTest(unittest.TestCase):
             "anthropic/claude-haiku-4-5-20251001", "gpt-5.3-codex-spark", "anthropic/claude-opus-4-8"])
         self.assertEqual(ocx.cfg["modelDiscovery"]["newModelPolicy"], "on")
         self.assertEqual(ocx.cfg["catalogAutoRefresh"], {"enabled": True, "intervalMinutes": 15})
+        # A repeated apply.sh must not re-add or reorder anything.
+        migrated = list(ocx.cfg["disabledModels"])
+        self.assertEqual(run(ocx, "--bootstrap")[0], 0)
+        self.assertEqual(ocx.cfg["disabledModels"], migrated)
 
 
 class PolicyTest(unittest.TestCase):
