@@ -17,7 +17,8 @@ py="$(command -v python3 || command -v python || true)"
 # Stops before writing anything when a provider login is missing or discovery fails.
 "$py" "$repo_dir/scripts/reconcile-models.py" --bootstrap
 
-# Install the skills, preserving anything already there under a timestamped backup.
+# Install the skills. A changed existing copy is moved to $CODEX_HOME/skill-backups, outside
+# the skills folder, so Codex does not load the backup as a second copy of the skill.
 CODEX_PROFILE_REPO="$repo_dir" "$py" - <<'PY'
 import hashlib, os, shutil, time
 
@@ -40,6 +41,7 @@ def tree_digest(root):
 
 skills_src = os.path.join(repo, "skills")
 skills_dst = os.path.join(codex_home, "skills")
+backups = os.path.join(codex_home, "skill-backups")
 os.makedirs(skills_dst, exist_ok=True)
 for name in sorted(os.listdir(skills_src)):
     src, dst = os.path.join(skills_src, name), os.path.join(skills_dst, name)
@@ -49,7 +51,8 @@ for name in sorted(os.listdir(skills_src)):
         if tree_digest(src) == tree_digest(dst):
             print(f"skill {name} already current")
             continue
-        backup = f"{dst}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+        os.makedirs(backups, exist_ok=True)
+        backup = os.path.join(backups, f"{name}.bak-{time.strftime('%Y%m%d-%H%M%S')}")
         shutil.move(dst, backup)
         print(f"existing skill moved to {backup}")
     shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__"))
