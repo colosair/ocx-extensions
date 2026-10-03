@@ -1,4 +1,5 @@
 {
+  "maxGenerationsPerFamily": 2,
   "providers": [
     {
       "name": "anthropic",
@@ -7,7 +8,7 @@
     },
     {
       "name": "google-antigravity",
-      "families": ["gemini", "claude-opus", "claude-sonnet", "gpt-oss"],
+      "families": ["gemini-flash", "gemini-pro", "gemini-flash-image", "claude-opus", "claude-sonnet", "gpt-oss"],
       "stripPrefix": "claude-",
       "namePrefix": "Google ",
       "namePrefixSkip": ["gemini"]
