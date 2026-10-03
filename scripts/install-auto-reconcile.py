@@ -8,6 +8,9 @@ names and picker position follow without anyone running the script by hand.
   macOS    ~/Library/LaunchAgents/com.ocx-extensions.reconcile.plist
   Linux    one user crontab line tagged "# ocx-extensions-reconcile"
 
+This is the only entry ocx-extensions schedules. It is separate from OpenCodex's own
+"opencodex-proxy" service task, which keeps the proxy running and is managed by ocx service.
+
 Re-running replaces the entry with the current repo path and Python, so there is
 always exactly one. To remove it:
 
@@ -38,9 +41,15 @@ LOG = os.path.join(tempfile.gettempdir(), f"{NAME}.log")
 
 
 def windows_python(python: str) -> str:
-    """pythonw.exe next to python.exe runs without opening a console every 15 minutes."""
+    """pythonw.exe next to python.exe, which runs without a console every 15 minutes.
+
+    python.exe would open a console window on every run, so it is refused rather than used.
+    """
     windowless = Path(python).with_name("pythonw.exe")
-    return str(windowless) if windowless.exists() else python
+    if Path(python).name.lower() == "pythonw.exe" or windowless.exists():
+        return str(windowless)
+    raise OSError(f"pythonw.exe not found next to {python}; a scheduled python.exe would flash a "
+                  "console every 15 minutes. Re-run apply.sh with a full Python install.")
 
 
 def windows_command(python: str, script: str) -> List[str]:
@@ -69,7 +78,9 @@ def cron_table(existing: str, python: str, script: str, path_env: str, log: str)
 
 
 def run(cmd: List[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, check=True, **kwargs)
+    # No console window for schtasks when this runs under pythonw (host-native setup).
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return subprocess.run(cmd, capture_output=True, text=True, check=True, creationflags=flags, **kwargs)
 
 
 def install() -> str:

@@ -5,7 +5,7 @@ description: Display current OpenCodex provider quotas and remaining usage as co
 
 # Opencodex Quota Bars
 
-Run `python3 scripts/quota-bars.py` to fetch live quota data with `ocx provider quota --json` and print it.
+Run `python3 scripts/quota-bars.py` to fetch live quota data with `ocx provider quota --json` and print it. The command is the same on every OS and needs no extra flags; the script prints UTF-8 itself. Where `python3` is not a working Python (for example the Windows Store alias), run the same script with `python`.
 
 Paste the command output into the chat in a fenced `text` block. Preserve its format:
 

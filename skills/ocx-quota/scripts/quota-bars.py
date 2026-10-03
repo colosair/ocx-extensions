@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from pathlib import Path as FilePath
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 
 Path = Tuple[str, ...]
@@ -174,19 +177,83 @@ def render_sections(sections: Sequence[Section]) -> str:
     )
 
 
+# Same hidden ocx launch as scripts/reconcile-models.py; the skill is installed on its own,
+# so it keeps a copy. test_reconcile_models.py checks that the two stay identical.
+NPM_SHIM_ENTRY = re.compile(r'"%dp0%\\([^"%]+\.(?:mjs|cjs|js))"', re.IGNORECASE)
+CMD_UNSAFE = set('%!\r\n\0')
+
+
+def npm_shim_entry(shim_text: str) -> Optional[str]:
+    match = NPM_SHIM_ENTRY.search(shim_text)
+    return match.group(1) if match else None
+
+
+def cmd_quote(arg: str) -> str:
+    if CMD_UNSAFE & set(arg):
+        raise RuntimeError(f"argument cannot be passed through cmd.exe safely: {arg!r}")
+    arg = re.sub(r'(\\+)(?="|$)', lambda m: m.group(1) * 2, arg)
+    return '"' + arg.replace('"', '""') + '"'
+
+
+def build_ocx_command(exe: str, args: Sequence[str], *, windows: bool = os.name == "nt",
+                      read_text: Callable[[str], str] = lambda p: FilePath(p).read_text(encoding="utf-8", errors="replace"),
+                      exists: Callable[[str], bool] = os.path.exists,
+                      which: Callable[[str], Optional[str]] = shutil.which,
+                      comspec: Optional[str] = None) -> Union[List[str], str]:
+    """argv that runs ocx without a console; an npm ocx.cmd shim is resolved to node + script."""
+    if not windows or not exe.lower().endswith((".cmd", ".bat")):
+        return [exe, *args]
+    folder = os.path.dirname(exe)
+    try:
+        entry = npm_shim_entry(read_text(exe))
+    except OSError:
+        entry = None
+    if entry:
+        script = os.path.join(folder, entry)
+        local_node = os.path.join(folder, "node.exe")
+        node = local_node if exists(local_node) else which("node")
+        if node and exists(script):
+            return [node, script, *args]
+    shell = comspec or os.environ.get("ComSpec") or r"C:\Windows\System32\cmd.exe"
+    inner = " ".join(cmd_quote(a) for a in [exe, *args])
+    return f'{cmd_quote(shell)} /d /s /c "{inner}"'
+
+
+def run_hidden(command: Union[List[str], str], timeout: int) -> subprocess.CompletedProcess:
+    extra: Dict[str, Any] = {}
+    if os.name == "nt":
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = 0  # SW_HIDE
+        extra = {"creationflags": subprocess.CREATE_NO_WINDOW, "startupinfo": startup}
+    return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          stdin=subprocess.DEVNULL, timeout=timeout, **extra)
+
+
+def use_utf8_output() -> None:
+    """Print UTF-8 even where the console or pipe defaults to a legacy code page (cp949).
+
+    Without this, Windows needs python -X utf8 to print the gauge characters at all.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", None) or "").lower().replace("-", "").replace("_", "")
+        if encoding == "utf8" or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass  # an already-written or detached stream keeps its encoding
+
+
 def fetch_reports(ocx: str) -> Sequence[object]:
     try:
-        result = subprocess.run(
-            [ocx, "provider", "quota", "--refresh", "--json"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = run_hidden(build_ocx_command(ocx, ["provider", "quota", "--refresh", "--json"]), timeout=15)
+        if result.returncode != 0:
+            raise RuntimeError("OpenCodex 쿼터 조회에 실패했습니다")
         payload = json.loads(result.stdout)
     except subprocess.TimeoutExpired as error:
         raise RuntimeError("OpenCodex 쿼터 조회 시간이 초과되었습니다") from error
-    except subprocess.CalledProcessError as error:
+    except OSError as error:
         raise RuntimeError("OpenCodex 쿼터 조회에 실패했습니다") from error
     except json.JSONDecodeError as error:
         raise RuntimeError("OpenCodex 쿼터 응답이 JSON 형식이 아닙니다") from error
@@ -198,6 +265,7 @@ def fetch_reports(ocx: str) -> Sequence[object]:
 
 
 def main() -> int:
+    use_utf8_output()
     ocx = shutil.which("ocx")
     if ocx is None:
         print("ocx command not found", file=sys.stderr)
