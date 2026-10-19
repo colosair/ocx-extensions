@@ -153,9 +153,13 @@ those providers is replaced on the next run; change the rules in `policy.json` i
 
 Order within the picker: native Codex models first in Codex's own order. This repo
 never adds bare native ids to `modelPickerOrder`, because one bare id would switch
-OpenCodex to ordering the whole picker. Then Anthropic (Fable, Opus, Sonnet, Haiku,
-other families), then Google Antigravity (Gemini Flash, Gemini Pro, Gemini Flash Image,
-Google Opus, Google Sonnet, Google GPT-OSS, other families), each family newest first.
+OpenCodex to ordering the whole picker. Then Anthropic (Fable, Opus, Sonnet, Haiku),
+then Google Antigravity (Gemini Flash, Gemini Pro, Gemini Flash Image, Google Opus,
+Google Sonnet, Google GPT-OSS), each family newest first. A family `policy.json` does not
+list joins the families of the same vendor (the same first word, such as `gemini` or
+`claude`) and goes ahead of the first one whose newest generation it matches or beats, so
+`gemini-4-argon` lands above Gemini 3.8 Flash without a policy edit. A family with no
+live vendor sibling goes after the known ones.
 Then every other routed model, so a new model from another provider cannot land outside
 the list and jump ahead: saved order is kept, a new model goes to the end of its
 provider's group, and a new provider goes after the known ones.
