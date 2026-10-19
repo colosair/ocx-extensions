@@ -268,8 +268,9 @@ class LatestGenerationsTest(unittest.TestCase):
         lives["anthropic"] += rows("anthropic", "claude-zeta-1")
         ocx = FakeOcx(base_config(), lives)
         run(ocx)
-        self.assertEqual(selected(ocx), ["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
-                                         "claude-nova-8", "claude-nova-7", "claude-zeta-1"])
+        # nova (8) is newer than every live Claude family, so it leads; zeta (1) is older than all.
+        self.assertEqual(selected(ocx), ["claude-nova-8", "claude-nova-7", "claude-fable-5-1",
+                                         "claude-opus-5-5", "claude-sonnet-5", "claude-zeta-1"])
         names = ocx.cfg["providers"]["anthropic"]["modelDisplayNames"]
         self.assertNotIn("claude-nova-8", names)  # provider-authored name wins
         self.assertEqual(names["claude-zeta-1"], "Zeta 1")
@@ -322,6 +323,19 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual((names["claude-opus-5-6"], names["claude-opus-5-5"]), ("Opus 5.6", "Opus 5.5"))
         self.assertEqual(ocx.cfg["disabledModels"], [])
 
+    def test_newer_unknown_vendor_family_goes_above_older_known_ones(self):
+        lives = copy.deepcopy(CURRENT)
+        lives["google-antigravity"] += rows("google-antigravity", "gemini-4-argon")
+        ocx = FakeOcx(base_config(), lives)
+        run(ocx)
+        self.assertEqual(selected(ocx, "google-antigravity")[:2], ["gemini-4-argon", "gemini-3.8-flash"])
+        # A Gemini family no newer than Flash sits right after it, still inside the Gemini block.
+        lives["google-antigravity"] += rows("google-antigravity", "gemini-3.5-ultra")
+        ocx = FakeOcx(base_config(), lives)
+        run(ocx)
+        picked = selected(ocx, "google-antigravity")
+        self.assertEqual(picked[:3], ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.5-ultra"])
+
     def test_new_gemini_and_unknown_family_are_listed(self):
         lives = copy.deepcopy(CURRENT)
         lives["google-antigravity"] += rows("google-antigravity", "gemini-3.9-flash")
@@ -329,7 +343,7 @@ class ReconcileTest(unittest.TestCase):
         ocx = FakeOcx(base_config(), lives)
         run(ocx)
         order = ocx.cfg["modelPickerOrder"]
-        self.assertLess(order.index("anthropic/claude-sonnet-5"), order.index("anthropic/claude-nova-6"))
+        self.assertLess(order.index("anthropic/claude-nova-6"), order.index("anthropic/claude-fable-5-1"))
         self.assertEqual(order.index("google-antigravity/gemini-3.9-flash") + 1,
                          order.index("google-antigravity/gemini-3.8-flash"))
         self.assertEqual(ocx.cfg["providers"]["anthropic"]["modelDisplayNames"]["claude-nova-6"], "Nova 6")

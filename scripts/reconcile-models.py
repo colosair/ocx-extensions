@@ -147,15 +147,33 @@ def preferred_variant(model_ids: Sequence[str]) -> str:
 def select_models(model_ids: Sequence[str], rules: Mapping[str, Any], limit: int) -> List[str]:
     """Newest 'limit' generations of each family, one id each, in picker order.
 
-    Families follow policy order (unknown families after, by name); inside a family the
-    newest generation comes first. Variants of one generation count once.
+    Families follow policy order; inside a family the newest generation comes first.
+    Variants of one generation count once. An unknown family joins its vendor's known
+    families (same first word) ahead of the first one whose newest generation it matches
+    or beats, so a new flagship like gemini-4-argon lands above gemini-3.8-flash. With
+    no live vendor sibling it goes after every known family, by name.
     """
     families: Dict[str, Dict[Tuple[int, ...], List[str]]] = {}
     for model_id in dict.fromkeys(model_ids):
         family, generation, _ = model_parts(model_id)
         families.setdefault(family, {}).setdefault(generation, []).append(model_id)
+    unknown = len(rules.get("families", []))
+
+    def rank(family: str) -> float:
+        own = family_rank(family, rules)
+        if own < unknown:
+            return own
+        vendor = family.split("-")[0]
+        siblings = sorted((family_rank(f, rules), max(families[f])) for f in families
+                          if f.split("-")[0] == vendor and family_rank(f, rules) < unknown)
+        newest = max(families[family])
+        for sibling_rank, sibling_newest in siblings:
+            if newest >= sibling_newest:
+                return sibling_rank - 0.5
+        return siblings[-1][0] + 0.5 if siblings else unknown
+
     picked: List[str] = []
-    for family in sorted(families, key=lambda f: (family_rank(f, rules), f)):
+    for family in sorted(families, key=lambda f: (rank(f), f)):
         generations = sorted(families[family], reverse=True)[:limit]
         picked += [preferred_variant(families[family][g]) for g in generations]
     return picked
