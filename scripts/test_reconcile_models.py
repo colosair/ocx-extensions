@@ -501,7 +501,7 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual(run(ocx, "--bootstrap")[0], 0)
         # hidden-and-known -> disabled; user entry kept; unseen arrival stays visible
         self.assertEqual(ocx.cfg["disabledModels"], [
-            "anthropic/claude-haiku-4-5-20251001", "gpt-5.3-codex-spark", "anthropic/claude-opus-4-8"])
+            "anthropic/claude-haiku-4-5-20251001", *POLICY["ensureDisabled"], "anthropic/claude-opus-4-8"])
         self.assertEqual(selected(ocx), ["claude-opus-5-5", "claude-opus-4-8", "claude-sonnet-5-5",
                                          "claude-haiku-4-5-20251001"])
         self.assertEqual(ocx.cfg["modelDiscovery"]["newModelPolicy"], "on")
@@ -518,7 +518,7 @@ class MigrationTest(unittest.TestCase):
         lives = {**CURRENT, "anthropic": rows("anthropic", "claude-opus-5", "claude-opus-5-5", "claude-opus-6")}
         ocx = FakeOcx(cfg, lives)
         self.assertEqual(run(ocx, "--bootstrap")[0], 0)
-        self.assertEqual(ocx.cfg["disabledModels"], ["gpt-5.3-codex-spark"])  # only ensureDisabled
+        self.assertEqual(ocx.cfg["disabledModels"], POLICY["ensureDisabled"])  # only ensureDisabled
         self.assertEqual(selected(ocx), ["claude-opus-6", "claude-opus-5-5"])
 
     def test_scheduled_run_leaves_a_legacy_allowlist_for_apply(self):

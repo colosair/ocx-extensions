@@ -14,7 +14,7 @@
       "namePrefixSkip": ["gemini"]
     }
   ],
-  "ensureDisabled": ["gpt-5.3-codex-spark"],
+  "ensureDisabled": ["gpt-5.3-codex-spark", "google-antigravity/gemini-4-carbon"],
   "config": {
     "modelDiscovery.newModelPolicy": "on",
     "catalogAutoRefresh": { "enabled": true, "intervalMinutes": 15 },
